@@ -60,6 +60,10 @@ def get_polynomial_points(coefficients, num_points, prime):
 def modular_lagrange_interpolation(x, points, prime):
     # break the points up into lists of x and y values
     x_values, y_values = zip(*points)
+    # the interpolation is only well-defined for distinct x values;
+    # duplicate x values make the denominator non-invertible
+    if len(set(x_values)) != len(x_values):
+        raise ValueError("Points must have distinct x values.")
     # initialize f(x) and begin the calculation: f(x) = SUM( y_i * l_i(x) )
     f_x = 0
     for i in range(len(points)):

@@ -44,14 +44,30 @@ def points_to_secret_int(points, prime=None):
     if not isinstance(points, list):
         raise ValueError("Points must be in list form.")
     for point in points:
-        if not isinstance(point, tuple) and len(point) == 2:
+        if not (isinstance(point, tuple) and len(point) == 2):
             raise ValueError("Each point must be a tuple of two values.")
         if not (isinstance(point[0], integer_types) and
                 isinstance(point[1], integer_types)):
             raise ValueError("Each value in the point must be an int.")
     x_values, y_values = zip(*points)
+    # the polynomial is sampled at x=1, x=2, ... so a point with x=0 is
+    # never a valid share and would directly leak the free coefficient
+    if any(x <= 0 for x in x_values):
+        raise ValueError("Point x values must be positive integers.")
+    # duplicate x values make the lagrange interpolation ill-defined
+    if len(set(x_values)) != len(x_values):
+        raise ValueError("Points must have distinct x values.")
     if not prime:
         prime = get_large_enough_prime(y_values)
+    # every coordinate must be a field element so the points describe
+    # a single polynomial modulo the chosen prime
+    for x, y in points:
+        if x >= prime:
+            raise ValueError(
+                "Point x values must be smaller than the prime.")
+        if y < 0 or y >= prime:
+            raise ValueError(
+                "Point y values must be smaller than the prime.")
     free_coefficient = modular_lagrange_interpolation(0, points, prime)
     secret_int = free_coefficient  # the secret int is the free coefficient
     return secret_int
@@ -84,9 +100,13 @@ def share_string_to_point(share_string, charset):
     if '-' in charset:
         raise ValueError(
             'The character "-" cannot be in the supplied charset.')
-    if not isinstance(share_string, str) and share_string.count('-') == 1:
+    if not isinstance(share_string, str):
+        raise ValueError('Share format is invalid.')
+    if share_string.count('-') != 1:
         raise ValueError('Share format is invalid.')
     x_string, y_string = share_string.split('-')
+    if not x_string or not y_string:
+        raise ValueError('Share format is invalid.')
     if (set(x_string) - set(charset)) or (set(y_string) - set(charset)):
         raise ValueError("Share has characters that aren't in the charset.")
     x = charset_to_int(x_string, charset)
